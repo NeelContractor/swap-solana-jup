@@ -46,12 +46,14 @@ export default function Home() {
     setToAsset(selectedAsset || assets[0]);
   };
 
-  const handleFromValueChange = (event: { target: { value: number; }; }) => {
-    const value = Number(event.target.value);
-    if (value >= 0) setFromAmount(value);
+  const handleFromValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = (Number(event?.target?.value));
+    if (!isNaN(value) && value >= 0) {
+      setFromAmount(value); 
+    }
   };
 
-  const debouncedGetQuote = useCallback(debounce(getQuote, 500), [fromAsset, toAsset]);
+  const debouncedGetQuote = useCallback(debounce(getQuote, 300), [fromAsset, toAsset]);
 
   useEffect(() => {
     if (fromAmount > 0) debouncedGetQuote(fromAmount);
