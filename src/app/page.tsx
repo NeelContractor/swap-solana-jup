@@ -46,7 +46,7 @@ export default function Home() {
     setToAsset(selectedAsset || assets[0]);
   };
 
-  const handleFromValueChange = (event: { target: { value: any; }; }) => {
+  const handleFromValueChange = (event: { target: { value: number; }; }) => {
     const value = Number(event.target.value);
     if (value >= 0) setFromAmount(value);
   };
