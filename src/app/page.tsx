@@ -2,9 +2,8 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-// List of assets available for swap
 const assets = [
   { name: 'SOL', mint: 'So11111111111111111111111111111111111111112', decimals: 9 },
   { name: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
@@ -12,17 +11,22 @@ const assets = [
   { name: 'WIF', mint: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', decimals: 6 },
 ];
 
-// Debounce function to prevent excessive API calls
 const debounce = <T extends unknown[]>(
   func: (...args: T) => void,
   wait: number
 ) => {
   let timeout: NodeJS.Timeout | undefined;
 
-  return (...args: T) => {
+  const debounced = (...args: T) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
+
+  debounced.cancel = () => {
+    if (timeout) clearTimeout(timeout);
+  };
+
+  return debounced;
 };
 
 export default function Home() {
@@ -53,27 +57,34 @@ export default function Home() {
     }
   };
 
-  const debouncedGetQuote = useCallback(debounce(getQuote, 300), [fromAsset, toAsset]);
+   const getQuote = useCallback(
+    async (amount: number) => {
+      try {
+        const response = await fetch(
+          `https://quote-api.jup.ag/v6/quote?inputMint=${fromAsset.mint}&outputMint=${toAsset.mint}&amount=${amount * 10 ** fromAsset.decimals}&slippage=0.5`
+        );
+        const quote = await response.json();
+        if (quote && quote.outAmount) {
+          const outAmount = Number(quote.outAmount) / 10 ** toAsset.decimals;
+          setToAmount(outAmount);
+          setQuoteResponse(quote);
+        }
+      } catch (error) {
+        console.error("Error fetching quote:", error);
+      }
+    },
+    [fromAsset, toAsset] 
+  );
+
+  const debouncedGetQuote = useMemo(() => debounce(getQuote, 300), [getQuote]);
 
   useEffect(() => {
     if (fromAmount > 0) debouncedGetQuote(fromAmount);
+    return () => {
+      debouncedGetQuote.cancel?.();
+    };
   }, [fromAmount, debouncedGetQuote]);
 
-  async function getQuote(amount: number) {
-    try {
-      const response = await fetch(
-        `https://quote-api.jup.ag/v6/quote?inputMint=${fromAsset.mint}&outputMint=${toAsset.mint}&amount=${amount * 10 ** fromAsset.decimals}&slippage=0.5`
-      );
-      const quote = await response.json();
-      if (quote && quote.outAmount) {
-        const outAmount = Number(quote.outAmount) / 10 ** toAsset.decimals;
-        setToAmount(outAmount);
-        setQuoteResponse(quote);
-      }
-    } catch (error) {
-      console.error('Error fetching quote:', error);
-    }
-  }
 
   async function signAndSendTransaction() {
     if (!wallet.connected || !wallet.signTransaction) {
